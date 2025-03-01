@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include "ggml/include/ggml-cpu.h"
+
 const int tensor_split_max = 16;
 const int images_max = 8;
 const int logprobs_max = 5;
@@ -66,6 +68,8 @@ struct load_model_inputs
     const int quant_v = 0;
     const bool quiet = false;
     const int debugmode = 0;
+    const enum ggml_numa_strategy numa = GGML_NUMA_STRATEGY_DISABLED;
+
 };
 struct generation_inputs
 {

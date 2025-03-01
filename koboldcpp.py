@@ -29,6 +29,7 @@ import html
 import urllib.parse as urlparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from enum import IntEnum
 
 # constants
 sampler_order_max = 7
@@ -123,6 +124,17 @@ VKIsDGPU = [0,0,0,0]
 MaxMemory = [0]
 MaxFreeMemory = [0]
 
+class NumaStrategy(IntEnum):
+    GGML_NUMA_STRATEGY_DISABLED   = 0
+    GGML_NUMA_STRATEGY_DISTRIBUTE = 1
+    GGML_NUMA_STRATEGY_ISOLATE    = 2
+    GGML_NUMA_STRATEGY_NUMACTL    = 3
+    GGML_NUMA_STRATEGY_MIRROR     = 4
+    @classmethod
+    def from_param(cls, obj):
+        return int(obj)
+
+
 class logit_bias(ctypes.Structure):
     _fields_ = [("token_id", ctypes.c_int32),
                 ("bias", ctypes.c_float)]
@@ -178,7 +190,8 @@ class load_model_inputs(ctypes.Structure):
                 ("quant_k", ctypes.c_int),
                 ("quant_v", ctypes.c_int),
                 ("quiet", ctypes.c_bool),
-                ("debugmode", ctypes.c_int)]
+                ("debugmode", ctypes.c_int),
+                ("numa", ctypes.c_int)]
 
 class generation_inputs(ctypes.Structure):
     _fields_ = [("seed", ctypes.c_int),
@@ -1095,6 +1108,18 @@ def load_model(model_filename):
             inputs.tensor_split[n] = float(args.tensor_split[n])
         else:
             inputs.tensor_split[n] = 0
+
+    if args.numa:
+        print(f"NUMA strategy selected: {args.numa}\n")
+
+    if args.numa == 'distribute':
+        inputs.numa = NumaStrategy.GGML_NUMA_STRATEGY_DISTRIBUTE
+    elif args.numa == 'isolate':
+        inputs.numa = NumaStrategy.GGML_NUMA_STRATEGY_ISOLATE
+    elif args.numa == 'numactl':
+        inputs.numa = NumaStrategy.GGML_NUMA_STRATEGY_NUMACTL
+    else:
+        inputs.numa = NumaStrategy.GGML_NUMA_STRATEGY_DISABLED
 
     inputs.moe_experts = args.moeexperts
     inputs = set_backend_props(inputs)
@@ -5813,6 +5838,7 @@ if __name__ == '__main__':
     advparser.add_argument("--unpack", help="Extracts the file contents of the KoboldCpp binary into a target directory.", metavar=('destination'), type=str, default="")
     advparser.add_argument("--nomodel", help="Allows you to launch the GUI alone, without selecting any model.", action='store_true')
     advparser.add_argument("--moeexperts", metavar=('[num of experts]'), help="How many experts to use for MoE models (default=follow gguf)", type=int, default=-1)
+    advparser.add_argument("--numa", metavar=('[distribute|isolate|numactl]'), nargs='?', const='distribute', choices=['distribute', 'isolate', 'numactl'], help="Attempt optimizations that help on some NUMA systems\n- distribute: spread execution evenly over all nodes. default when not specified\n- isolate: only spawn threads on CPUs on the node that execution started on\n- numactl: use the CPU map provided by numactl\nf run without this previously, it is recommended to drop the system page cache before using this\n", )
     compatgroup2 = parser.add_mutually_exclusive_group()
     compatgroup2.add_argument("--showgui", help="Always show the GUI instead of launching the model right away when loading settings from a .kcpps file.", action='store_true')
     compatgroup2.add_argument("--skiplauncher", help="Doesn't display or use the GUI launcher.", action='store_true')

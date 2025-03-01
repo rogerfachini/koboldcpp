@@ -2066,6 +2066,8 @@ ModelLoadResult gpttype_load_model(const load_model_inputs inputs, FileFormat in
     {
         llama_backend_init();
 
+        llama_numa_init(inputs.numa);
+
         llama_model_params model_params = llama_model_default_params();
         llama_context_params llama_ctx_params = llama_context_default_params();
         llama_ctx_params.n_ctx = clamped_max_context_length;
